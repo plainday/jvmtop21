@@ -288,16 +288,8 @@ bash scripts/verify.sh src/target/jvmtop.jar jdk/jdk8 jdk/jdk21
 
 ## 7. 알려진 제약 / Flag 사항
 
-1. **instantaneous CPU% = 0.00%:** Cowork VM의 CPU throttle로 인해 jvmtop의 delta 계산이 0으로 나온다. TOTALCPU(누적)은 정상. Phase 3 후 더 긴 interval 테스트로 재확인 필요.
+1. **instantaneous CPU% = 0.00% (원본 jvmtop 기준) — 포팅본에서 해소됨:** Phase 0에서 원본 jvmtop(JDK 8 내부 경로)으로 측정 시 0.00%였던 문제는, 포팅본(JDK 21 JMX `getThreadCpuTime()` 경로)에서 해소됐다. Phase 3에서 `-d 1` `-d 3` 두 조건 모두 CPU-BURNER 순간 CPU% 88~97% 확인(Cowork VM, JDK 21 victim). **RHEL에서도 정상 동작 예상.**
 2. **cross-version attach 미검증:** Phase 0에서는 JDK 8 도구 → JDK 8 victim만 확인. Phase 4 stretch goal.
 3. **RHEL 미검증:** Ubuntu VM에서만 확인. RHEL 검증은 사람(작업자)이 수행.
 4. **`jvmtop.bat` 미업데이트:** Phase 4 best-effort 대상.
-5. **`VMProfileView` / `CPUSampler`:** Phase 0에서 별도 테스트 안 함. verify.sh 범위 밖. Phase 3에서 함께 확인.
-
----
-
----
-
-## 8. Phase 2 정리 — 의도된 결정 기록
-
-| # 
+5.
