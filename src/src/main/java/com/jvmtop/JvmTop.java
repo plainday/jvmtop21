@@ -119,6 +119,10 @@ public class JvmTop
   {
     Locale.setDefault(Locale.US);
 
+    // Print immediately before any initialization so the user knows the
+    // process is alive. Startup (JMX connect / VM scan) can take ~60 seconds.
+    System.err.println("Starting jvmtop. Initialization may take up to 60 seconds, please wait...");
+
     logger = Logger.getLogger("jvmtop");
 
     OptionParser parser = createOptionParser();
