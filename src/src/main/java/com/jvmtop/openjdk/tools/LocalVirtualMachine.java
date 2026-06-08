@@ -179,17 +179,16 @@ public class LocalVirtualMachine
   private static final String LOCAL_CONNECTOR_ADDRESS_PROP =
       "com.sun.management.jmxremote.localConnectorAddress";
 
-  /** Our own PID — excluded from the VM list to avoid self-attach errors.
-   * (JDK 21 default: jdk.attach.allowAttachSelf=false; hiding self is cleaner
-   * than adding the flag, per SPEC §3.)
-   */
-  private static final long SELF_PID = ProcessHandle.current().pid();
-
   /**
    * Discovers all attachable VMs via VirtualMachine.list() (public API,
    * jdk.attach module). For each VM not already in the map, attempts a
    * brief attach to read the JMX connector address from agent properties.
-   * jvmtop's own PID is excluded so it never appears in the overview.
+   *
+   * Self-attach (jvmtop's own PID) is NOT filtered here. Whether jvmtop
+   * appears in the overview is determined purely by whether VirtualMachine.attach()
+   * succeeds. With the JDK 21 default (jdk.attach.allowAttachSelf=false) it
+   * fails -> ERROR_DURING_ATTACH -> VMOverviewView silently excludes that row.
+   * With -Djdk.attach.allowAttachSelf=true it succeeds -> jvmtop shown normally.
    */
   private static void getAttachableVMs(Map<Integer, LocalVirtualMachine> map,
       Map<Integer, LocalVirtualMachine> existingVmMap)
@@ -200,11 +199,6 @@ public class LocalVirtualMachine
       try
       {
         Integer vmid = Integer.valueOf(vmd.id());
-        // Skip our own process — self-attach is disabled by default in JDK 21.
-        if (vmid.longValue() == SELF_PID)
-        {
-          continue;
-        }
         if (map.containsKey(vmid) || existingVmMap.containsKey(vmid))
         {
           continue;

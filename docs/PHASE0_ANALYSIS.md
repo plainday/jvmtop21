@@ -296,4 +296,8 @@ bash scripts/verify.sh src/target/jvmtop.jar jdk/jdk8 jdk/jdk21
 
 ---
 
-*Phase 0 완료. Phase 1 진행 전 사람 검토 대기.*
+---
+
+## 8. Phase 2 정리 — 의도된 결정 기록
+
+| # 
