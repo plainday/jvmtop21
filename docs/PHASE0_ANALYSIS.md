@@ -292,4 +292,23 @@ bash scripts/verify.sh src/target/jvmtop.jar jdk/jdk8 jdk/jdk21
 2. **cross-version attach 미검증:** Phase 0에서는 JDK 8 도구 → JDK 8 victim만 확인. Phase 4 stretch goal.
 3. **RHEL 미검증:** Ubuntu VM에서만 확인. RHEL 검증은 사람(작업자)이 수행.
 4. **`jvmtop.bat` 미업데이트:** Phase 4 best-effort 대상.
-5.
+5. **`jvmtop.bat` 업데이트 필요:** Windows 런처도 `tools.jar` 제거 및 `allowAttachSelf` 옵션 추가 필요. Phase 4 best-effort 대상.
+
+---
+
+## 8. Phase 2+ 결정 사항
+
+### 8.1 ERROR_DURING_ATTACH 행 제외 (Phase 2 cleanup)
+
+`VMOverviewView`에서 `ERROR_DURING_ATTACH` 상태의 VM 행을 오류 메시지 없이 조용히 제외한다.
+이유: JDK 21 기본값(`jdk.attach.allowAttachSelf=false`)에서 jvmtop 자신의 PID에 attach를 시도하면
+`IOException`이 발생하며 이 상태가 된다. 오류를 화면에 노출하지 않는 것이 더 깔끔한 UX이며,
+self-attach 외에도 VM이 attach 도중 종료된 경우 등 일시적 실패를 포괄한다.
+
+### 8.2 -Djdk.attach.allowAttachSelf=true — §6.3-6 정당화된 최소 옵션
+
+`src/src/main/wrappers/jvmtop.sh`에 `-Djdk.attach.allowAttachSelf=true`를 기본 포함한다.
+- 원본 jvmtop 0.8.0(golden reference)은 자기 자신을 overview에 표시했다.
+- JDK 21에서 self-attach를 허용하려면 이 플래그가 필요하다(JDK 21 기본: false).
+- JDK 21 런처에 `tools.jar`는 존재하지 않으므로 `-cp ... tools.jar` 항목도 제거됐다.
+- 이 두 가지 변경이 §6.3-6에서 허용되는 "정당화된 최소 launcher 옵션"이다.
