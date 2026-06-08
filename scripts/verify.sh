@@ -159,7 +159,8 @@ grep -q "allowAttachSelf=true" "$LAUNCHER" \
   || fail "§6.3-6: jvmtop.sh missing -Djdk.attach.allowAttachSelf=true"
 pass "§6.3-6: jvmtop.sh contains -Djdk.attach.allowAttachSelf=true (§6.3-6 justified)"
 
-grep -q "tools\.jar" "$LAUNCHER" \
+# Exclude comment lines so that "removed tools.jar" in a comment does not false-positive
+grep -v "^[[:space:]]*#" "$LAUNCHER" | grep -q "tools\.jar" \
   && fail "§6.3-6: jvmtop.sh still references tools.jar (must be removed for JDK 21)"
 pass "§6.3-6: jvmtop.sh has no tools.jar reference"
 
