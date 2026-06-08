@@ -84,40 +84,86 @@ else
   JT_JAVA="$JAVA21"
 fi
 
-# ── run jvmtop: overview ─────────────────────────────────────────────────────
+# ── §6.3 check 1: victim visible in overview ─────────────────────────────────
 info "Running jvmtop overview (n=2, d=3)..."
 OVERVIEW=$(timeout 30 "$JT_JAVA" -cp "$JT_CP" com.jvmtop.JvmTop -n 2 -d 3 -w 120 2>&1 | cat)
 echo "$OVERVIEW"
 
 echo "$OVERVIEW" | grep -q "$VICTIM_PID" \
   || fail "Victim PID $VICTIM_PID not visible in overview"
-pass "Victim visible in overview"
+pass "§6.3-1: Victim visible in overview"
 
-# ── run jvmtop: thread detail ─────────────────────────────────────────────────
+# ── §6.3 check 4: heap/nonheap in overview row for victim ────────────────────
+# Overview format: PID MAIN-CLASS HPCUR HPMAX NHCUR NHMAX CPU GC VM USERNAME #T DL
+# HPCUR and NHCUR should be non-zero (e.g. "7m", "10m") for a live JVM.
+VICTIM_ROW=$(echo "$OVERVIEW" | grep "^[[:space:]]*$VICTIM_PID ")
+info "Victim overview row: $VICTIM_ROW"
+
+echo "$VICTIM_ROW" | grep -qE '[1-9][0-9]*m' \
+  || fail "§6.3-4: heap/nonheap value missing or zero for victim in overview"
+pass "§6.3-4: heap/nonheap values non-zero in overview row"
+
+# ── §6.3 check 2+3+5: thread detail ─────────────────────────────────────────
 info "Running jvmtop thread detail for PID $VICTIM_PID (n=3, d=4, all threads)..."
 DETAIL=$(timeout 40 "$JT_JAVA" -cp "$JT_CP" com.jvmtop.JvmTop -n 3 -d 4 -w 120 --disable-threadlimit $VICTIM_PID 2>&1 | cat)
 echo "$DETAIL"
 
-# Must see CPU-BURNER as RUNNABLE
+# check 2a: CPU-BURNER present
 echo "$DETAIL" | grep -q "CPU-BURNER" \
-  || fail "CPU-BURNER thread not found in detail view"
-pass "CPU-BURNER thread visible"
+  || fail "§6.3-2: CPU-BURNER thread not found in detail view"
+pass "§6.3-2a: CPU-BURNER thread visible"
 
+# check 2b: CPU-BURNER RUNNABLE
 echo "$DETAIL" | grep "CPU-BURNER" | grep -q "RUNNABLE" \
-  || fail "CPU-BURNER thread not RUNNABLE"
-pass "CPU-BURNER thread is RUNNABLE"
+  || fail "§6.3-2: CPU-BURNER thread not RUNNABLE"
+pass "§6.3-2b: CPU-BURNER thread is RUNNABLE"
 
-# IDLE-MAIN must be present and not RUNNABLE (TIMED_WAITING)
+# check 2c: IDLE-MAIN present
 echo "$DETAIL" | grep -q "IDLE-MAIN" \
-  || fail "IDLE-MAIN thread not found"
-pass "IDLE-MAIN thread visible"
+  || fail "§6.3-2: IDLE-MAIN thread not found"
+pass "§6.3-2c: IDLE-MAIN thread visible"
 
-# Must not contain attach error
+# check 3: TOTALCPU for CPU-BURNER > 50%
+# Thread detail line format: TID NAME STATE CPU% TOTALCPU%
+# Extract TOTALCPU (last % value on CPU-BURNER line) using grep -o | tail -1
+TOTALCPU=$(echo "$DETAIL" | grep "CPU-BURNER" | tail -1 \
+           | grep -oE '[0-9]+\.[0-9]+%' | tail -1 | tr -d '%')
+info "CPU-BURNER TOTALCPU: ${TOTALCPU}%"
+echo "$TOTALCPU" | awk '{if ($1+0 > 50) exit 0; else exit 1}' \
+  || fail "§6.3-3: CPU-BURNER TOTALCPU ${TOTALCPU}% not > 50%"
+pass "§6.3-3: CPU-BURNER TOTALCPU ${TOTALCPU}% > 50%"
+
+# check 4 (detail): HEAP and NONHEAP lines present and non-zero
+echo "$DETAIL" | grep -qE 'HEAP:[[:space:]]+[1-9][0-9]*m' \
+  || fail "§6.3-4: HEAP value missing or zero in thread detail"
+pass "§6.3-4: HEAP value present and non-zero in detail"
+
+echo "$DETAIL" | grep -qE 'NONHEAP:[[:space:]]+[1-9][0-9]*m' \
+  || fail "§6.3-4: NONHEAP value missing or zero in thread detail"
+pass "§6.3-4: NONHEAP value present and non-zero in detail"
+
+# check 5: no attach error
 echo "$DETAIL" | grep -qi "ERROR.*attach\|Could not attach" \
-  && fail "Attach error detected in output"
-pass "No attach error"
+  && fail "§6.3-5: Attach error detected in output"
+pass "§6.3-5: No attach error"
+
+# ── §6.3 check 6: launcher options ───────────────────────────────────────────
+LAUNCHER="$REPO_ROOT/src/src/main/wrappers/jvmtop.sh"
+[ -f "$LAUNCHER" ] || fail "§6.3-6: jvmtop.sh not found at $LAUNCHER"
+
+grep -q "\-\-add-opens\|\-\-add-exports" "$LAUNCHER" \
+  && fail "§6.3-6: jvmtop.sh contains unexpected --add-opens/--add-exports"
+pass "§6.3-6: jvmtop.sh has no --add-opens/--add-exports"
+
+grep -q "allowAttachSelf=true" "$LAUNCHER" \
+  || fail "§6.3-6: jvmtop.sh missing -Djdk.attach.allowAttachSelf=true"
+pass "§6.3-6: jvmtop.sh contains -Djdk.attach.allowAttachSelf=true (§6.3-6 justified)"
+
+grep -q "tools\.jar" "$LAUNCHER" \
+  && fail "§6.3-6: jvmtop.sh still references tools.jar (must be removed for JDK 21)"
+pass "§6.3-6: jvmtop.sh has no tools.jar reference"
 
 echo ""
 echo "============================================"
-echo " ALL CHECKS PASSED"
+echo " ALL §6.3 CHECKS PASSED"
 echo "============================================"
