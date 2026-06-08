@@ -893,45 +893,38 @@ public class ProxyClient
     /**
      * Returns the process CPU time (nanoseconds) of the monitored JVM.
      *
-     * JDK 21 port: the original code used Proxy/reflection to invoke
-     * com.sun.management.OperatingSystemMXBean.getProcessCpuTime() indirectly,
-     * working around the fact that the JMX proxy object's concrete class was
-     * not com.sun.management.OperatingSystemMXBean.
-     *
-     * The correct JDK 9+ approach is to request the proxy directly with the
-     * desired interface via ManagementFactory.newPlatformMXBeanProxy(), which
-     * returns a proxy that implements com.sun.management.OperatingSystemMXBean.
-     * That interface is public API in the jdk.management module.
+     * JDK 21 port (P3-1): For HotSpot (non-J9), use
+     * com.sun.management.OperatingSystemMXBean directly via
+     * newPlatformMXBeanProxy() — public API in jdk.management, no reflection
+     * needed. For IBM J9, the reflection fallback is kept because
+     * com.ibm.lang.management.OperatingSystemMXBean is not on the JDK 21
+     * classpath and J9 is outside the JDK 21 porting scope (SPEC §4).
      */
     public long getProcessCpuTime() throws Exception
     {
         try
         {
-            String osMXBeanClassName = lvm.isJ9Mode()
-                ? "com.ibm.lang.management.OperatingSystemMXBean"
-                : "com.sun.management.OperatingSystemMXBean";
-
-            Class<? extends java.lang.management.OperatingSystemMXBean> osMXBeanClass =
-                Class.forName(osMXBeanClassName)
-                     .asSubclass(java.lang.management.OperatingSystemMXBean.class);
-
-            java.lang.management.OperatingSystemMXBean bean =
-                newPlatformMXBeanProxy(server, OPERATING_SYSTEM_MXBEAN_NAME,
-                                       osMXBeanClass);
-
-            // getProcessCpuTime() is defined on com.sun.management.OperatingSystemMXBean
-            // and com.ibm.lang.management.OperatingSystemMXBean — invoke via reflection
-            // so this compiles without a direct dependency on either subtype.
-            long cpuTime = (Long) osMXBeanClass
-                .getMethod("getProcessCpuTime")
-                .invoke(bean);
-
             if (lvm.isJ9Mode())
             {
-                // J9 returns the value in 100ns units (violates the spec)
+                // J9 fallback: reflect into com.ibm.lang.management.OperatingSystemMXBean.
+                // J9 returns values in 100ns units (spec violation) — multiply by 100.
+                @SuppressWarnings("unchecked")
+                Class<? extends java.lang.management.OperatingSystemMXBean> j9Class =
+                    (Class<? extends java.lang.management.OperatingSystemMXBean>)
+                    Class.forName("com.ibm.lang.management.OperatingSystemMXBean")
+                         .asSubclass(java.lang.management.OperatingSystemMXBean.class);
+                java.lang.management.OperatingSystemMXBean bean =
+                    newPlatformMXBeanProxy(server, OPERATING_SYSTEM_MXBEAN_NAME, j9Class);
+                long cpuTime = (Long) j9Class.getMethod("getProcessCpuTime").invoke(bean);
                 return cpuTime * 100;
             }
-            return cpuTime;
+
+            // HotSpot / JDK 21: direct API, no reflection.
+            // com.sun.management.OperatingSystemMXBean is public API (jdk.management).
+            com.sun.management.OperatingSystemMXBean bean =
+                newPlatformMXBeanProxy(server, OPERATING_SYSTEM_MXBEAN_NAME,
+                                       com.sun.management.OperatingSystemMXBean.class);
+            return bean.getProcessCpuTime();
         }
         catch (Throwable e)
         {
