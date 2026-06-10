@@ -148,7 +148,7 @@ echo "$DETAIL" | grep -qi "ERROR.*attach\|Could not attach" \
 pass "§6.3-5: No attach error"
 
 # ── §6.3 check 6: launcher options ───────────────────────────────────────────
-LAUNCHER="$REPO_ROOT/src/src/main/wrappers/jvmtop.sh"
+LAUNCHER="$REPO_ROOT/src/main/wrappers/jvmtop.sh"
 [ -f "$LAUNCHER" ] || fail "§6.3-6: jvmtop.sh not found at $LAUNCHER"
 
 grep -q "\-\-add-opens\|\-\-add-exports" "$LAUNCHER" \
