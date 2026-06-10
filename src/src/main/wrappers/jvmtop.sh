@@ -7,6 +7,9 @@
 #   -Djdk.attach.allowAttachSelf=true so jvmtop shows its own process in
 #   the overview (matching original golden-reference behaviour — §6.3-6
 #   justified minimal option, see docs/PHASE0_ANALYSIS.md §8).
+#   -Dsun.tools.attach.attachTimeout=3000 caps per-VM JMX attach at 3 s
+#   (default 10 s) so slow/unresponsive VMs do not stall the overview scan
+#   (see docs/PHASE0_ANALYSIS.md §8.3).
 #
 DIR=$(cd "$(dirname "$0")" && pwd -P)
 
@@ -21,6 +24,7 @@ fi
 
 exec "$JAVA_HOME/bin/java" \
   -Djdk.attach.allowAttachSelf=true \
+  -Dsun.tools.attach.attachTimeout=3000 \
   $JAVA_OPTS \
   -cp "$DIR/jvmtop.jar" \
   com.jvmtop.JvmTop "$@"
