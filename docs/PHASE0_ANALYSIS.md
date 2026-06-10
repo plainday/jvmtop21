@@ -305,6 +305,25 @@ bash scripts/verify.sh src/target/jvmtop.jar jdk/jdk8 jdk/jdk21
 `IOException`이 발생하며 이 상태가 된다. 오류를 화면에 노출하지 않는 것이 더 깔끔한 UX이며,
 self-attach 외에도 VM이 attach 도중 종료된 경우 등 일시적 실패를 포괄한다.
 
+### 8.3 VM 목록 구성 전략 — attach 없는 목록 / per-VM 지연 attach / 짧은 타임아웃 (Phase 4)
+
+**문제:** 원래 `getAttachableVMs()`는 `VirtualMachine.list()`로 PID를 나열한 뒤 각 VM에 `VirtualMachine.attach()`를 호출했다. 느린 VM(응답 지연 ~10.6 s)이 4개 있는 환경에서 overview/상세 진입 전 약 42 s 지연이 발생했다.
+
+**해결 — 세 가지 변경:**
+
+1. **목록 단계(Fix B):** `getAttachableVMs()`에서 `VirtualMachine.attach()` 제거. `VirtualMachineDescriptor`의 `id`·`displayName`만으로 목록을 구성한다(`attachable=true`, `address=null`). attach는 일절 없다.
+
+2. **상세 모드(Fix A):** `getLocalVirtualMachine(vmid)`에서 `getAllVirtualMachines()` 호출 제거. `VirtualMachine.list()` 순회는 displayName 조회용으로만 사용하고(attach 없음), 지정된 vmid 단 하나에만 attach한다.
+
+3. **attach 타임아웃(Fix C):** `jvmtop.sh`에 `-Dsun.tools.attach.attachTimeout=3000` 추가. 이 시스템 프로퍼티는 `sun.tools.attach.HotSpotVirtualMachine` 인스턴스 필드 `attachTimeout`을 통해 per-attach 시 읽힌다(상수가 아닌 인스턴스 필드 — 첫 attach 전에 설정하면 유효). 기본 10 s → 3 s로 단축.
+
+**컬럼 영향:** 없음. `address=null`이면 `ProxyClient.connect()`가 `startManagementAgent()` → `loadManagementAgent()` → `VirtualMachine.attach()`를 호출한다(기존과 동일 경로). attach 실패 VM은 `ERROR_DURING_ATTACH` → overview에서 조용히 제외(§8.1과 동일). 성공 VM은 기존과 동일한 컬럼·값.
+
+**트레이드오프:**
+- 목록 화면은 즉시 표시된다. 각 VM의 JMX 지표(HPCUR, NHCUR, CPU% 등)는 첫 번째 overview 갱신 주기에 채워진다.
+- 느린 VM 하나가 overview 전체를 막지 않는다(3 s 타임아웃 적용).
+- 상세 모드에서는 지정 PID에만 attach하므로 다른 VM의 응답 속도가 영향을 주지 않는다.
+
 ### 8.2 -Djdk.attach.allowAttachSelf=true — §6.3-6 정당화된 최소 옵션
 
 `src/src/main/wrappers/jvmtop.sh`에 `-Djdk.attach.allowAttachSelf=true`를 기본 포함한다.
