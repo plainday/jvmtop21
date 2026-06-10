@@ -3,7 +3,7 @@
 # jvmtop21 — jvmtop JDK 21 포팅
 
 [patric-r/jvmtop](https://github.com/patric-r/jvmtop) 0.8.0을 JDK 21에서 빌드·실행되도록 포팅한 프로젝트입니다.
-원본은 개발 중단 상태이며 JDK 8까지만 동작합니다. 라이선스·출처는 원본을 따릅니다(Apache 2.0, [LICENSE](LICENSE) 참조).
+원본은 개발 중단 상태이며 JDK 8까지만 동작합니다. 라이선스·출처는 원본을 따릅니다(GPL-2.0, [LICENSE](LICENSE) 참조).
 
 ---
 
@@ -69,4 +69,4 @@ JAVA_HOME=/path/to/jdk21 target/jvmtop.sh --profile <pid>  # CPU 프로파일 �
 
 ## 라이선스
 
-원본 [patric-r/jvmtop](https://github.com/patric-r/jvmtop)의 라이선스(Apache 2.0)를 따릅니다. [LICENSE](LICENSE) 참조.
+원본 [patric-r/jvmtop](https://github.com/patric-r/jvmtop)의 라이선스(GPL-2.0)를 따릅니다. [LICENSE](LICENSE) 참조.

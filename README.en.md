@@ -3,7 +3,7 @@
 # jvmtop21 — jvmtop ported to JDK 21
 
 A port of [patric-r/jvmtop](https://github.com/patric-r/jvmtop) 0.8.0 to build and run on JDK 21.
-The original project is discontinued and only works up to JDK 8. License and attribution follow the original (Apache 2.0, see [LICENSE](LICENSE)).
+The original project is discontinued and only works up to JDK 8. License and attribution follow the original (GPL-2.0, see [LICENSE](LICENSE)).
 
 ---
 
@@ -69,4 +69,4 @@ The only verified launcher is **`jvmtop.sh` (Linux)**.
 
 ## License
 
-Follows the license of the original [patric-r/jvmtop](https://github.com/patric-r/jvmtop) (Apache 2.0). See [LICENSE](LICENSE).
+Follows the license of the original [patric-r/jvmtop](https://github.com/patric-r/jvmtop) (GPL-2.0). See [LICENSE](LICENSE).
