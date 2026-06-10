@@ -180,15 +180,15 @@ public class LocalVirtualMachine
       "com.sun.management.jmxremote.localConnectorAddress";
 
   /**
-   * Discovers all attachable VMs via VirtualMachine.list() (public API,
-   * jdk.attach module). For each VM not already in the map, attempts a
-   * brief attach to read the JMX connector address from agent properties.
+   * Builds the VM list using only VirtualMachineDescriptor (id, displayName)
+   * from VirtualMachine.list() — no attach is performed here.
    *
-   * Self-attach (jvmtop's own PID) is NOT filtered here. Whether jvmtop
-   * appears in the overview is determined purely by whether VirtualMachine.attach()
-   * succeeds. With the JDK 21 default (jdk.attach.allowAttachSelf=false) it
-   * fails -> ERROR_DURING_ATTACH -> VMOverviewView silently excludes that row.
-   * With -Djdk.attach.allowAttachSelf=true it succeeds -> jvmtop shown normally.
+   * All discovered VMs are recorded as attachable=true, address=null.
+   * The JMX connector address is resolved lazily, per-VM, when
+   * VMInfo.processNewVM() → ProxyClient.connect() calls startManagementAgent()
+   * → loadManagementAgent() → VirtualMachine.attach(). This defers the
+   * expensive attach to the first overview refresh cycle and prevents slow VMs
+   * from blocking the initial list-building step (see §8.3 in PHASE0_ANALYSIS).
    */
   private static void getAttachableVMs(Map<Integer, LocalVirtualMachine> map,
       Map<Integer, LocalVirtualMachine> existingVmMap)
@@ -203,31 +203,12 @@ public class LocalVirtualMachine
         {
           continue;
         }
-        boolean attachable = false;
-        String address = null;
-        try
-        {
-          VirtualMachine vm = VirtualMachine.attach(vmd);
-          attachable = true;
-          Properties agentProps = vm.getAgentProperties();
-          address = (String) agentProps.get(LOCAL_CONNECTOR_ADDRESS_PROP);
-          vm.detach();
-        }
-        catch (AttachNotSupportedException x)
-        {
-          // not attachable
-        }
-        catch (NullPointerException e)
-        {
-          // ignore
-        }
-        catch (IOException x)
-        {
-          // ignore
-        }
+        // No attach: descriptor provides id and displayName without any IPC.
+        // address=null causes ProxyClient.connect() to call startManagementAgent()
+        // on first use, which performs exactly one VirtualMachine.attach() per VM.
         map.put(vmid,
             new LocalVirtualMachine(vmid.intValue(), vmd.displayName(),
-                attachable, address));
+                true, null));
       }
       catch (NumberFormatException e)
       {
@@ -239,24 +220,24 @@ public class LocalVirtualMachine
   public static LocalVirtualMachine getLocalVirtualMachine(int vmid)
       throws Exception
   {
-    Map<Integer, LocalVirtualMachine> map = getAllVirtualMachines();
-    LocalVirtualMachine lvm = map.get(vmid);
-    if (lvm == null)
+    // Detail mode: resolve display name from the descriptor list (no attach —
+    // VirtualMachine.list() is a fast IPC-free enumeration), then attach only
+    // to the requested vmid. No scan of other VMs on the system.
+    String displayName = String.valueOf(vmid);
+    for (VirtualMachineDescriptor vmd : VirtualMachine.list())
     {
-      // Check if the VM is attachable but not included in the list
-      // (e.g. running with a different security context).
-      boolean attachable = false;
-      String address = null;
-      String name = String.valueOf(vmid);
-
-      VirtualMachine vm = VirtualMachine.attach(name);
-      attachable = true;
-      Properties agentProps = vm.getAgentProperties();
-      address = (String) agentProps.get(LOCAL_CONNECTOR_ADDRESS_PROP);
-      vm.detach();
-      lvm = new LocalVirtualMachine(vmid, name, attachable, address);
+      if (vmd.id().equals(String.valueOf(vmid)))
+      {
+        displayName = vmd.displayName();
+        break;
+      }
     }
-    return lvm;
+
+    VirtualMachine vm = VirtualMachine.attach(String.valueOf(vmid));
+    Properties agentProps = vm.getAgentProperties();
+    String address = (String) agentProps.get(LOCAL_CONNECTOR_ADDRESS_PROP);
+    vm.detach();
+    return new LocalVirtualMachine(vmid, displayName, true, address);
   }
 
   public static LocalVirtualMachine getDelegateMachine(VirtualMachine vm)
